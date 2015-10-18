@@ -6,6 +6,7 @@
 import os
 import sys
 import click
+import html2text
 from sqlalchemy import create_engine
 from sqlalchemy import Table, Column, Integer, String, MetaData, ForeignKey
 from sqlalchemy.sql import select
@@ -13,16 +14,28 @@ from sqlalchemy.exc import ProgrammingError
 from sqlalchemy_utils import database_exists
 
 def make_markdown(result, target):
-    print u"Converting '%d' to Markdown in '%s'" % (result.id, target)
-    fh = open(os.path.join(target, "%05d-%s.md" % (result.id, result.alias)), "w+")
-    fh.write("----\n")
-    fh.write("title: '%s'\n" % result.title)
-    fh.write("alias: '%s'\n" % result.alias)
-    fh.write("language: %s\n" % result.language)
-    fh.write("author: '%s'\n" % result.created_by)
-    fh.write("timestamp: %s\n" % result.created)
-    fh.write("----\n")
-    fh.write(result.fulltext)
+    outfile = os.path.join(target, "%06d-%s.md" % (result.id, result.alias))
+    print u"%06d -> %s" % (result.id, outfile)
+    h = html2text.HTML2Text()
+    try:
+        md = h.handle(result.fulltext)
+    except:
+        print "Couldn't convert to Markdown; falling back to HTML."
+        md = result.fulltext
+    with open(outfile, "wb+") as fh:
+        fh.write("----\n")
+        fh.write("title: '%s'\n" % result.title)
+        fh.write("alias: '%s'\n" % result.alias)
+        fh.write("language: %s\n" % result.language)
+        fh.write("author: '%s'\n" % result.created_by)
+        fh.write("timestamp: %s\n" % result.created)
+        fh.write("----\n")
+        # print md
+        try:
+            fh.write(md.encode("utf-8"))
+        except:
+            fh.write(md)
+            
 
 def joomla_get_articles(connection, prefix):
     if prefix: prefix = "%s_" % prefix

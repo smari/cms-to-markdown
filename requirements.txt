@@ -1,0 +1,4 @@
+sqlalchemy
+sqlalchemy_utils
+click
+html2text

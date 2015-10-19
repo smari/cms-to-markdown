@@ -7,5 +7,7 @@ Currently only support Joomla.
 ## Use
 
 ```bash
-python markdownize.py --database path://to/database --target directory --joomla-table-prefix myprefix
+./markdownize.py --mode joomla --database path://to/database --target directory --table-prefix myprefix
 ```
+
+See also `./markdownize.py --help`

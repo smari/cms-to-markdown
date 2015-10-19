@@ -13,31 +13,38 @@ from sqlalchemy.sql import select
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy_utils import database_exists
 
-def make_markdown(result, target):
-    outfile = os.path.join(target, "%06d-%s.md" % (result.id, result.alias))
-    print u"%06d -> %s" % (result.id, outfile)
-    h = html2text.HTML2Text()
-    try:
-        md = h.handle(result.fulltext)
-    except:
-        print "Couldn't convert to Markdown; falling back to HTML."
-        md = result.fulltext
-    with open(outfile, "wb+") as fh:
-        fh.write("----\n")
-        fh.write("title: '%s'\n" % result.title)
-        fh.write("alias: '%s'\n" % result.alias)
-        fh.write("language: %s\n" % result.language)
-        fh.write("author: '%s'\n" % result.created_by)
-        fh.write("timestamp: %s\n" % result.created)
-        fh.write("----\n")
-        # print md
+class Article:
+    def __init__(self):
+        self.id = None
+        self.title = None
+        self.body = None
+        self.slug = None
+        self.metadata = {}
+
+    def output(self, target):
+        outfile = os.path.join(target, "%06d-%s.md" % (self.id, self.slug))
+        print u"%06d -> %s" % (self.id, outfile)
+        h = html2text.HTML2Text()
         try:
-            fh.write(md.encode("utf-8"))
+            md = h.handle(self.body)
         except:
-            fh.write(md)
+            print "Couldn't convert to Markdown; falling back to HTML."
+            md = self.body
+        with open(outfile, "wb+") as fh:
+            fh.write("----\n")
+            fh.write("title: '%s'\n" % self.title)
+            fh.write("slug: '%s'\n" % self.slug)
+            for key,value in self.metadata.iteritems():
+                fh.write("%s: %s\n" % (key, value))
+            fh.write("----\n")
+            try:
+                fh.write(md.encode("utf-8"))
+            except:
+                fh.write(md)
 
 
 def joomla_get_articles(connection, prefix, even_drafts):
+    print "Getting articles from Joomla"
     if prefix: prefix = "%s_" % prefix
     metadata = MetaData()
     joomla_articles = Table('%scontent' % prefix, metadata,
@@ -53,15 +60,31 @@ def joomla_get_articles(connection, prefix, even_drafts):
         Column('modified_by', Integer),
     )
     s = select([joomla_articles])
-    if not even_drafts:
-        s = s.where(state='1')
+    # if not even_drafts:
+    #    s = s.where(joomla_articles.c.state=='1')
     print str(s)
     try:
         results = connection.execute(s)
     except ProgrammingError, e:
         print e, e[0]
         sys.exit()
-    return results
+
+    articles = []
+    for r in results:
+        a = Article()
+        a.id = r.id
+        a.title = r.title
+        a.body = r.fulltext
+        a.slug = r.alias
+        a.metadata['language'] = r.language
+        a.metadata['author'] = r.created_by
+        a.metadata['timestamp'] = r.created
+        a.metadata['editor'] = r.modified_by
+        a.metadata['timestamp_modified'] = r.modified
+        articles.append(a)
+
+    return articles
+
 
 def wordpress_get_articles(connection, prefix, even_drafts):
     raise NotImplementedError()
@@ -72,7 +95,6 @@ article_handlers = {
     'wordpress': wordpress_get_articles,
 }
 
-
 @click.command()
 @click.option('--mode', type=click.Choice(['joomla', 'wordpress']))
 @click.option('--database', prompt='Database to connect to?',
@@ -80,7 +102,8 @@ article_handlers = {
 @click.option('--target', prompt='Target directory?', help='Target directory')
 @click.option('--even-drafts', default=False, is_flag=True, help='Include unpublished drafts')
 @click.option('--table-prefix', default='', help='Database table prefix, if any')
-def main(mode, database, target, table_prefix, even_drafts):
+@click.option('--verbose', default=False, is_flag=True)
+def main(mode, database, target, table_prefix, even_drafts, verbose):
     # 1. Connect to PostgreSQL database
     engine = create_engine(database)
     connection = engine.connect()
@@ -90,8 +113,7 @@ def main(mode, database, target, table_prefix, even_drafts):
 
     # 3. Generate Markdown
     for result in results:
-        make_markdown(result, target)
-
+        result.output(target)
 
 if __name__ == "__main__":
     main()

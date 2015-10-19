@@ -2,7 +2,7 @@
 
 An easy way to get your stuff out of your ugly CMS.
 
-Currently only supports Joomla.
+Currently only supports Joomla and Wordpress.
 
 ## Use
 

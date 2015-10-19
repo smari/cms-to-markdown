@@ -35,9 +35,9 @@ def make_markdown(result, target):
             fh.write(md.encode("utf-8"))
         except:
             fh.write(md)
-            
 
-def joomla_get_articles(connection, prefix):
+
+def joomla_get_articles(connection, prefix, even_drafts):
     if prefix: prefix = "%s_" % prefix
     metadata = MetaData()
     joomla_articles = Table('%scontent' % prefix, metadata,
@@ -53,6 +53,8 @@ def joomla_get_articles(connection, prefix):
         Column('modified_by', Integer),
     )
     s = select([joomla_articles])
+    if not even_drafts:
+        s = s.where(state='1')
     print str(s)
     try:
         results = connection.execute(s)
@@ -61,23 +63,30 @@ def joomla_get_articles(connection, prefix):
         sys.exit()
     return results
 
+def wordpress_get_articles(connection, prefix, even_drafts):
+    raise NotImplementedError()
+    return []
+
+article_handlers = {
+    'joomla': joomla_get_articles,
+    'wordpress': wordpress_get_articles,
+}
+
 
 @click.command()
-@click.option('--joomla-table-prefix', default='')
+@click.option('--mode', type=click.Choice(['joomla', 'wordpress']))
 @click.option('--database', prompt='Database to connect to?',
     help='Database to connect to')
 @click.option('--target', prompt='Target directory?', help='Target directory')
-def main(database, target, joomla_table_prefix, **kwargs):
+@click.option('--even-drafts', default=False, is_flag=True, help='Include unpublished drafts')
+@click.option('--table-prefix', default='', help='Database table prefix, if any')
+def main(mode, database, target, table_prefix, even_drafts):
     # 1. Connect to PostgreSQL database
     engine = create_engine(database)
     connection = engine.connect()
 
-    # if not database_exists(engine):
-    #    print "Database %s does not exist" % database
-    #    return
-
     # 2. List articles
-    results = joomla_get_articles(connection, joomla_table_prefix)
+    results = article_handlers[mode](connection, table_prefix, even_drafts)
 
     # 3. Generate Markdown
     for result in results:

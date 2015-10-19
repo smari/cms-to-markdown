@@ -7,6 +7,7 @@ import os
 import sys
 import click
 import html2text
+import slugify
 from sqlalchemy import create_engine
 from sqlalchemy import Table, Column, Integer, String, MetaData, ForeignKey
 from sqlalchemy.sql import select
@@ -44,7 +45,6 @@ class Article:
 
 
 def joomla_get_articles(connection, prefix, even_drafts):
-    print "Getting articles from Joomla"
     if prefix: prefix = "%s_" % prefix
     metadata = MetaData()
     joomla_articles = Table('%scontent' % prefix, metadata,
@@ -60,9 +60,8 @@ def joomla_get_articles(connection, prefix, even_drafts):
         Column('modified_by', Integer),
     )
     s = select([joomla_articles])
-    # if not even_drafts:
-    #    s = s.where(joomla_articles.c.state=='1')
-    print str(s)
+    if not even_drafts:
+        s = s.where(joomla_articles.c.state=='1')
     try:
         results = connection.execute(s)
     except ProgrammingError, e:
@@ -87,8 +86,39 @@ def joomla_get_articles(connection, prefix, even_drafts):
 
 
 def wordpress_get_articles(connection, prefix, even_drafts):
-    raise NotImplementedError()
-    return []
+    if prefix: prefix = "%s_" % prefix
+    metadata = MetaData()
+    wp_articles = Table('%swp_posts' % prefix, metadata,
+        Column('ID', Integer, primary_key=True),
+        Column('post_title', String),
+        Column('post_content', String),
+        Column('post_status', String),
+        Column('post_author', Integer),
+        Column('post_date', String),
+        Column('post_modified', String),
+    )
+    s = select([joomla_articles])
+    if not even_drafts:
+        s = s.where(joomla_articles.c.status=='publish')
+    try:
+        results = connection.execute(s)
+    except ProgrammingError, e:
+        print e, e[0]
+        sys.exit()
+
+    articles = []
+    for r in results:
+        a = Article()
+        a.id = r.ID
+        a.title = r.post_title
+        a.body = r.post_content
+        a.slug = slugify.slugify(r.post_title)
+        a.metadata['author'] = r.post_author
+        a.metadata['timestamp'] = r.post_date
+        a.metadata['timestamp_modified'] = r.post_modified
+        articles.append(a)
+
+    return articles
 
 article_handlers = {
     'joomla': joomla_get_articles,

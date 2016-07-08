@@ -11,3 +11,13 @@ Currently only supports Joomla and Wordpress.
 ```
 
 See also `./markdownize.py --help`
+
+## TODO
+
+ - [ ] Support tags
+ - [ ] Support categories
+ - [ ] Fix encoding problems
+ - [ ] First picture should go into frontmatter
+ - [ ] Get proper authorship information
+ - [ ] Put correct image captions in place
+

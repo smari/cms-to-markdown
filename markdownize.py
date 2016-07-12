@@ -24,7 +24,8 @@ class Article:
         self.metadata = {}
 
     def output(self, target, fallback=True):
-        outfile = os.path.join(target, "%06d-%s.md" % (self.id, self.slug))
+        temp = self.slug[:100]
+        outfile = os.path.join(target, "%s.md" % (temp))
         print u"%06d -> %s" % (self.id, outfile)
         h = html2text.HTML2Text()
         try:
@@ -114,14 +115,18 @@ def joomla_get_articles(connection, prefix, even_drafts):
         a.id = r.id
         a.title = r.title
         a.body = r.fulltext
-        a.slug = r.alias
+        #a.slug = r.alias
         a.language = r.language[:2]
         a.metadata['tags'] = article_tags
         a.metadata['author'] = r.created_by
-        a.metadata['timestamp'] = r.created
+        a.metadata['timestamp'] = r.created.date()
+        a.metadata['date_created'] = r.created.date()
         a.metadata['editor'] = r.modified_by
         a.metadata['timestamp_modified'] = r.modified
         articles.append(a)
+        temp = r.created.date()
+        temp = temp.strftime('%Y-%m-%d')
+        a.slug = temp + '-' + r.alias
 
     print "Done."
 
@@ -140,9 +145,9 @@ def wordpress_get_articles(connection, prefix, even_drafts):
         Column('post_date', String),
         Column('post_modified', String),
     )
-    s = select([joomla_articles])
+    s = select([wp_articles])
     if not even_drafts:
-        s = s.where(joomla_articles.c.status=='publish')
+        s = s.where(wp_articles.c.status=='publish')
     try:
         results = connection.execute(s)
     except ProgrammingError, e:
